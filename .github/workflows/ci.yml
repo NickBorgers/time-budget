@@ -10,6 +10,8 @@ jobs:
     container: swift:6.0-jammy
     steps:
       - uses: actions/checkout@v4
+      # The Swift image has no make, which the devcontainer's setup.sh also adds.
+      - run: apt-get update -qq && apt-get install -y -qq make
       # The same target the devcontainer runs, so CI cannot disagree with a
       # clean local checkout.
       - run: make check
