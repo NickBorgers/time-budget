@@ -1,0 +1,24 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    container: swift:6.0-jammy
+    steps:
+      - uses: actions/checkout@v4
+      # The same target the devcontainer runs, so CI cannot disagree with a
+      # clean local checkout.
+      - run: make check
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      # The core must build and pass on the platform the app ships on. The Mac
+      # app target will be built here once it exists.
+      - run: swift build
+      - run: swift test

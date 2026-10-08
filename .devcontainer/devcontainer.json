@@ -1,0 +1,35 @@
+{
+  "name": "time-budget",
+  // The Swift toolchain image has no `vscode` user, which the devcontainer tooling
+  // and ~/code/util's dcs/dcr expect. common-utils adds it (plus sudo).
+  "image": "swift:6.0-jammy",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "username": "vscode",
+      "userUid": "automatic",
+      "userGid": "automatic"
+    },
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  // Mount the checkout at its *host* path rather than the default /workspaces/<repo>.
+  // Claude Code keys per-project state by the working-directory path, so a container
+  // that sees a different path sees an empty project. Aligning the two makes the host
+  // and container agents share one project identity.
+  "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind,consistency=cached",
+  "workspaceFolder": "${localWorkspaceFolder}",
+  // No host config is mounted here on purpose. This file describes the project, not
+  // the machine. The agent CLIs, shell profile, credentials, gh login and project
+  // memory come from ~/code/util, injected at launch by `dcs`/`dcr`, which hand the
+  // container derived tokens instead of the host's refresh tokens.
+  // Start this container with `dcr` (or `dcs` to reuse a running one).
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["swiftlang.swift-vscode"]
+    }
+  },
+  "remoteUser": "vscode"
+}
