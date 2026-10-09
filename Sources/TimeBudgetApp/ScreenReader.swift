@@ -50,7 +50,11 @@ enum ScreenReader {
       evidence.recognitionNote = "no Screen Recording permission"
       return evidence
     }
-    switch await TextRecognition.read(pid: pid, title: window.title) {
+    guard let identity = window.identity else {
+      evidence.recognitionNote = "focused window has no frame, or its tree was not fully read"
+      return evidence
+    }
+    switch await TextRecognition.read(pid: pid, identity: identity) {
     case .success(let recognized):
       evidence.recognizedText = recognized
       if evidence.textSource == .none, !recognized.isEmpty {
@@ -78,9 +82,43 @@ enum AccessibilityText {
     var title: String?
     var host: String?
     var text: String
+    /// The focused window on screen, in global coordinates with the origin at
+    /// the top left. Text recognition uses it to find the same window.
+    var frame: CGRect?
+    /// What the exclude list checked. Text recognition compares it again just
+    /// before and after the screenshot.
+    var identity: Identity?
     /// False when the focused window is unknown. Text recognition then has no
     /// title to check against the exclude list, so it must not run.
     var mayRecognizeText = true
+  }
+
+  /// The parts of the focused window that the exclude list checks.
+  struct Identity: Equatable, Sendable {
+    var title: String?
+    var frame: CGRect
+    var hosts: [String]
+  }
+
+  /// Reads the identity of the focused window again, with no text. Nil when
+  /// any read fails or is inconclusive.
+  static func identity(pid: pid_t) -> Identity? {
+    let app = AXUIElementCreateApplication(pid)
+    AXUIElementSetMessagingTimeout(app, timeoutSeconds)
+    guard let window: AXUIElement = value(app, kAXFocusedWindowAttribute),
+      let frame = frame(of: window)
+    else { return nil }
+    var rawTitle: CFTypeRef?
+    let title: String?
+    switch AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &rawTitle) {
+    case .success: title = rawTitle as? String
+    case .noValue, .attributeUnsupported: title = nil
+    default: return nil
+    }
+    var finder = WebAreaFinder()
+    finder.walk(window, depth: 0)
+    guard finder.conclusive else { return nil }
+    return Identity(title: title, frame: frame, hosts: finder.hosts)
   }
 
   /// Limits that keep one read short on a window with a very large tree.
@@ -124,10 +162,15 @@ enum AccessibilityText {
     }
 
     // Pass 2 reads the text.
-    var walker = Walker(windowFrame: frame(of: window))
+    let windowFrame = frame(of: window)
+    var walker = Walker(windowFrame: windowFrame)
     walker.walk(window, depth: 0)
     return Window(
-      title: title, host: finder.hosts.first, text: TextTools.joinVisibleText(walker.pieces))
+      title: title, host: finder.hosts.first, text: TextTools.joinVisibleText(walker.pieces),
+      frame: windowFrame,
+      identity: windowFrame.flatMap { frame in
+        finder.conclusive ? Identity(title: title, frame: frame, hosts: finder.hosts) : nil
+      })
   }
 
   /// Finds every web area and its address. Reads no text.
@@ -260,25 +303,42 @@ enum TextRecognition {
     let description: String
   }
 
-  static func read(pid: pid_t, title: String?) async -> Result<String, Skipped> {
+  /// Two frames closer than this, in points, are the same window.
+  static let frameTolerance: CGFloat = 2
+
+  static func read(pid: pid_t, identity: AccessibilityText.Identity) async -> Result<
+    String, Skipped
+  > {
+    let frame = identity.frame
+    // The user can switch windows during the async steps below. Check the
+    // focused window again just before and just after the screenshot. If it
+    // changed, the screenshot may show a window that the exclude list did
+    // not check, so it is thrown away.
+    @Sendable func unchanged() async -> Bool {
+      await Task.detached { AccessibilityText.identity(pid: pid) }.value == identity
+    }
     do {
       let content = try await SCShareableContent.excludingDesktopWindows(
         true, onScreenWindowsOnly: true)
       let candidates = content.windows.filter {
         $0.owningApplication?.processID == pid && $0.windowLayer == 0 && $0.frame.width > 50
       }
-      // Only the window whose title matches the focused window: that title
-      // passed the exclude list. With no title, only a lone window is safe.
-      let matches =
-        title.map { title in candidates.filter { $0.title == title } }
-        ?? candidates.filter { ($0.title ?? "").isEmpty }
+      // Only the focused window, found by its position and size: its title
+      // passed the exclude list. Apps report different titles to the two
+      // APIs (Chrome does), so titles do not identify it. Two windows of the
+      // app in the same place are ambiguous, so the app reads neither.
+      let matches = candidates.filter { sameFrame($0.frame, frame) }
       guard matches.count == 1, let window = matches.first else {
         return .failure(
           Skipped(
             description:
-              "\(matches.count) windows match the focused title, of \(candidates.count) on screen"))
+              "\(matches.count) windows match the focused window frame, of \(candidates.count) on screen"
+          ))
       }
 
+      guard await unchanged() else {
+        return .failure(Skipped(description: "focused window changed before the screenshot"))
+      }
       let filter = SCContentFilter(desktopIndependentWindow: window)
       let config = SCStreamConfiguration()
       let scale = CGFloat(filter.pointPixelScale)
@@ -287,10 +347,18 @@ enum TextRecognition {
       config.showsCursor = false
       let image = try await SCScreenshotManager.captureImage(
         contentFilter: filter, configuration: config)
+      guard await unchanged() else {
+        return .failure(Skipped(description: "focused window changed during the screenshot"))
+      }
       return .success(try await Task.detached { try recognize(image) }.value)
     } catch {
       return .failure(Skipped(description: "failed: \(error.localizedDescription)"))
     }
+  }
+
+  static func sameFrame(_ a: CGRect, _ b: CGRect) -> Bool {
+    abs(a.minX - b.minX) <= frameTolerance && abs(a.minY - b.minY) <= frameTolerance
+      && abs(a.width - b.width) <= frameTolerance && abs(a.height - b.height) <= frameTolerance
   }
 
   private static func recognize(_ image: CGImage) throws -> String {
