@@ -26,6 +26,18 @@ public struct SliceEvidence: Codable, Equatable, Sendable {
   /// test. Nil when it ran, or when it was not wanted for this slice.
   public var recognitionNote: String?
   public var secondsSinceInput: Double
+  /// What the user typed in the last minute, from `TypingTracker`. It goes to
+  /// the model only: it is not part of the encoding, so it never reaches the
+  /// capture log.
+  public var typedText: String = ""
+  /// How many characters the user typed in the last minute. Stored: it shows
+  /// writing against reading, without the text. Nil when not measured.
+  public var typedCharacters: Int?
+
+  private enum CodingKeys: String, CodingKey {
+    case appName, bundleID, windowTitle, host, visibleText, textSource, recognizedText
+    case recognitionNote, secondsSinceInput, typedCharacters
+  }
 
   public init(
     appName: String,
@@ -47,17 +59,17 @@ public struct SliceEvidence: Codable, Equatable, Sendable {
     self.secondsSinceInput = secondsSinceInput
   }
 
-  /// True when the app, title, host and text are the same as in `other`.
-  /// Idle time and recognized text are not part of the comparison (spec step
-  /// 3, "Unchanged").
+  /// True when the app, title, host, text and typed text are the same as in
+  /// `other`. Idle time and recognized text are not part of the comparison
+  /// (spec step 3, "Unchanged").
   public func sameContent(as other: SliceEvidence) -> Bool {
     appName == other.appName && bundleID == other.bundleID && windowTitle == other.windowTitle
-      && host == other.host && visibleText == other.visibleText
+      && host == other.host && visibleText == other.visibleText && typedText == other.typedText
   }
 }
 
 /// The label of one slice (spec F3).
-public enum SliceLabel: Codable, Equatable, Sendable {
+public enum SliceLabel: Codable, Hashable, Sendable {
   case allocation(UUID)
   case unassigned
   case idle
@@ -71,7 +83,8 @@ public enum SliceTrigger: String, Codable, Sendable {
   case appSwitch
 }
 
-/// One line of the capture log: the evidence, and the label the user gave it.
+/// One line of the capture log: the evidence, the label that counted, and the
+/// label the user gave it.
 public struct SliceRecord: Codable, Equatable, Sendable {
   public var time: Date
   public var trigger: SliceTrigger
@@ -80,13 +93,17 @@ public struct SliceRecord: Codable, Equatable, Sendable {
   /// The capture test (milestone 2) compares classifiers against this.
   public var userLabel: SliceLabel
   /// The classifier's probability for `label`, from 0 to 1 (spec F3). Nil when
-  /// no classifier ran: in this version the user sets the label by hand.
+  /// the label did not come from the classifier.
   public var confidence: Double?
+  /// What the classifier decided, with its reason. It is stored even when the
+  /// user's selection counted, so the capture test can compare the two. Nil
+  /// when the classifier did not run, for example at an app switch.
+  public var decision: SliceDecision?
   public var evidence: SliceEvidence
 
   public init(
     time: Date, trigger: SliceTrigger, label: SliceLabel, userLabel: SliceLabel,
-    confidence: Double? = nil, evidence: SliceEvidence
+    confidence: Double? = nil, decision: SliceDecision? = nil, evidence: SliceEvidence
   ) {
     precondition(confidence.map { (0...1).contains($0) } ?? true, "confidence is a probability")
     self.time = time
@@ -94,16 +111,18 @@ public struct SliceRecord: Codable, Equatable, Sendable {
     self.label = label
     self.userLabel = userLabel
     self.confidence = confidence
+    self.decision = decision
     self.evidence = evidence
   }
 }
 
 extension SliceRecord {
   private enum CodingKeys: String, CodingKey {
-    case time, trigger, label, userLabel, confidence, evidence
+    case time, trigger, label, userLabel, confidence, decision, evidence
   }
 
-  /// Rejects a stored confidence that is not a probability.
+  /// Rejects a stored confidence that is not a probability. Lines from before
+  /// the classifier have no decision.
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     let confidence = try c.decodeIfPresent(Double.self, forKey: .confidence)
@@ -117,6 +136,7 @@ extension SliceRecord {
       label: try c.decode(SliceLabel.self, forKey: .label),
       userLabel: try c.decode(SliceLabel.self, forKey: .userLabel),
       confidence: confidence,
+      decision: try c.decodeIfPresent(SliceDecision.self, forKey: .decision),
       evidence: try c.decode(SliceEvidence.self, forKey: .evidence))
   }
 }

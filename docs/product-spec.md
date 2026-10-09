@@ -11,9 +11,9 @@ The app measures real work on a Mac against a time budget for each type of work.
 
 This spec lists two ways to build the app. Option A forks Dayflow, a native Mac app with an MIT license. Option B puts a new Swift app on the screenpipe capture engine. **The recommendation is Option A.** The screenpipe license requires a paid commercial license for use at work. A bundled engine needs that agreement before the first release.
 
-The model is OpenJev 4B v5, with an MIT license. We convert it to MLX and place it in the app bundle. The install is one disk image of about 3 GB.
+The model is OpenJev 4B v5, with an MIT license. We convert it to 8-bit MLX and place it in the app bundle. The install is one disk image of about 4.5 GB.
 
-Two tests come before the main build. The first test proves that the model gives correct labels in Swift. The second test measures how well screen text separates the allocations.
+Two tests come before the main build. The first test proves that the model gives correct labels in Swift. It is done: see [model-test.md](model-test.md). The second test measures how well screen text separates the allocations.
 
 ## Problem and goals
 
@@ -29,7 +29,7 @@ The user accepts too much work because no signal says when one type of work has 
 **Non-goals**
 
 - Billing, invoices, and client timesheets.
-- Reports for a manager, or any monitoring of other people.
+- Reports for a manager, or any monitoring of other people. The app must not be usable as a monitoring tool. See [Not a monitoring tool](#not-a-monitoring-tool).
 - Calendar scheduling. The app measures time. It does not plan time.
 - App or website blocking.
 - Windows, Linux, iOS, and Intel Macs.
@@ -110,7 +110,7 @@ These values are proposed. The prototype in milestone 1 confirms or changes them
 | Alert delay after a budget is crossed | 2 minutes or less |
 | Minutes that match the user's own label, after 1 week of corrections | 85% or more |
 | Average CPU use during a work day | 5% or less of one core |
-| Memory while the model is loaded | 4 GB or less |
+| Memory while the model is loaded | 5 GB or less. Accepted on 2026-10-08 after milestone 1 measured 4.9 GB with the 4B checkpoint at 8 bits. The first proposal was 4 GB |
 | Disk use, model included | 5 GB or less |
 | Network needed after install | None |
 
@@ -240,25 +240,27 @@ The app uses [OpenJev](https://huggingface.co/AlexWortega/openjev), an open-weig
 
 | Checkpoint | Input | Note from the model card | Size of the 4-bit MLX base model | Role in the app |
 | --- | --- | --- | --- | --- |
-| `qwen3.5-4b-nli-v5` | Text | Recommended for typed decisions. 0.814 on the public JevBench items; Jev 1.13 scores 0.866 | About 2.9 GB | Default |
-| `qwen3.5-4b-nli-v2` | Text and images | 0.84 on image claims | About 2.9 GB | Fallback for a screen with no readable text |
-| `qwen3.5-0.8b-nli-v5` | Text | Smallest v5 checkpoint | About 622 MB | Default on a Mac with 8 GB of memory |
+| `qwen3.5-4b-nli-v5` | Text | Recommended for typed decisions. 0.814 on the public JevBench items; Jev 1.13 scores 0.866 | 4.2 GB at 8 bits (measured) | Default |
+| `qwen3.5-4b-nli-v2` | Text and images | 0.84 on image claims | About 4.5 GB at 8 bits | Fallback for a screen with no readable text |
+| `qwen3.5-2b-nli-v5` | Text | Smaller v5 checkpoint. 9 of 18 test slices right, against 16 of 18 for 4B | 1.9 GB at 8 bits (measured) | Candidate for a Mac with 8 GB of memory |
 
-The sizes come from the MLX conversions of the base models, [Qwen3.5-4B](https://huggingface.co/mlx-community/Qwen3.5-4B-MLX-4bit) and [Qwen3.5-0.8B](https://huggingface.co/mlx-community/Qwen3.5-0.8B-MLX-4bit). The OpenJev conversions will be close to these values. Milestone 1 measures them.
+The repo has no `qwen3.5-0.8b-nli-v5` checkpoint, which an earlier version of this table named. The smallest checkpoint is `qwen3.5-0.8b-nli-v2s-long`.
+
+**Quantization.** 4 bits breaks the classifier: the scores go almost flat, and half of the winning options change. 8 bits stays within 0.03 of bf16. 6 bits is a possible middle step (3.4 GB for 4B, within 0.07 on a small test). See [model-test.md](model-test.md).
 
 **Runtime**
 
 - The app runs the model with MLX, Apple's array framework for Apple silicon. The Swift package is [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm).
 - The model runs inside the app process. The app starts no server and opens no port.
 - OpenJev publishes its weights for the Python Transformers library. We found no MLX build of OpenJev.
-- Work item: convert the weights to 4-bit MLX. Add the classification head in Swift. The head reads the last token and returns three label scores.
-- Work item: port the shared-prefix method from the model card. The app encodes the long screen text one time, then scores each allocation against it.
-- Acceptance test: the Swift port and the Python reference give the same label on 99% or more of a fixed test set. This target is proposed.
+- Done: `scripts/convert_openjev.py` converts the weights to 8-bit MLX. The `score` head runs in Swift. It reads the last token and returns three label scores.
+- Done: the shared-prefix method from the model card. The app runs the shared tokens of the premise once, then scores each allocation from a copy of that state.
+- Acceptance test: the Swift port and the Python reference give the same label on 99% or more of a fixed test set. This target is proposed. Result: 18 of 18 on the first, small test set.
 
 **How the app brings the model**
 
 1. The build script places the converted model in `Contents/Resources/Models/` inside the app bundle.
-2. The release is one signed and notarized disk image of about 3 GB. The user drags the app to Applications.
+2. The release is one signed and notarized disk image of about 4.5 GB. The user drags the app to Applications.
 3. The first launch needs no network. The app does not download a model.
 4. At launch, the app compares a SHA-256 hash of each model file with a list that is signed with the app.
 5. Updates use [Sparkle delta updates](https://www.sparkle-project.org/documentation/delta-updates/). A delta update sends only the files that changed. An app update does not send the model again.
@@ -287,7 +289,7 @@ The app trims the visible text to about 1,500 tokens. The 0.8B checkpoint has a 
 2. Idle: if the last input is more than 5 minutes old and no meeting is active, label the slice `Idle`.
 3. Unchanged: if the evidence matches the previous slice, copy the previous label. Run no model.
 4. Pinned rules: apply rules that the user wrote, for example `Slack channel starts with #partner- → Partner team help`.
-5. Model: send the evidence as the state. Send each allocation description as an option, plus `None of these`. Take the option with the highest probability.
+5. Model: send the evidence as the state. Send each allocation description as an option, plus `None of these`. Take the option with the highest probability. When `None of these` wins, the slice is `Unassigned`.
 6. Threshold: if the highest probability is below 0.6, label the slice `Unassigned`. This value is proposed.
 7. Smooth: join neighbor slices with the same label into one block. A single slice between two blocks of one label takes that label.
 
@@ -317,15 +319,29 @@ The app keeps the smallest record that supports the ledger and the corrections. 
 | Data | Kept for | Note |
 | --- | --- | --- |
 | Ledger: minutes for each allocation in each period | Until the user deletes it | The only long-term record |
-| Slice evidence: app, title, trimmed text, label | 14 days | Needed for the timeline and for corrections |
+| Slice evidence: app, title, trimmed text, label | 14 days | Needed for the timeline and for corrections. In a production build, encrypted. See below |
+| Typed text: what the user typed in the last minute | Memory only, about 60 seconds | Goes to the model. Never written to disk. The log keeps only the number of characters typed |
 | Screenshots | Deleted after text recognition | The user can turn on a 3-day window for review |
 | Corrections and pinned rules | Until the user deletes them | Used to improve labels |
 
 The retention values are proposed. All data sits in one SQLite database in `~/Library/Application Support/`. One menu command deletes everything.
 
+**The capture log in a production build** (decided 2026-10-08)
+
+The test builds write the slice evidence as plain JSON lines, because milestone 2 needs to read them. A production build does not:
+
+- It writes no readable capture log. If it keeps slice evidence at all, it keeps it encrypted.
+- The encryption key is created on the Mac and stored in the Keychain. Its access control allows only the app's own code signature to read it. Another app, a script, or a copy of the files on another Mac cannot read the evidence.
+- The evidence leaves the app only through an explicit Export command. The user starts it, and the export shows what it contains.
+- Open question: the exact macOS mechanism. Candidates are a CryptoKit key in the Keychain with an access control limited to the app, or the Secure Enclave. Both need a stable Developer ID signature, so the key survives app updates.
+
+**Typed text**
+
+The app does not read keystrokes. Every 5 seconds, it reads the content of the focused text field through Accessibility, as it reads the rest of the screen. It keeps the text that was added while a key was pressed, for about 60 seconds, and gives it to the model as part of the premise. Password fields show no content through Accessibility, and the app skips them. Excluded apps, windows and sites are not read. Additions of more than 300 characters in 5 seconds count as a paste or program output, not typing.
+
 **What the app never does**
 
-- It does not log keystrokes. It reads text that is visible on the screen. It does not request the Input Monitoring permission.
+- It does not log keystrokes. It reads text that is visible on the screen, including the focused text field. It does not request the Input Monitoring permission. It never stores what the user typed.
 - It sends no analytics and no crash reports.
 - Its only network request is the update check. The request carries no user data. The user can turn it off.
 
@@ -350,11 +366,23 @@ macOS 15 asks the user to confirm screen recording access [each month](https://9
 
 The screen shows messages from other people and company data. An employer can also block these permissions with device management. Get approval from the employer before the first install.
 
+### Not a monitoring tool
+
+A key risk is that an employer uses the app to watch an employee. The app is for the person at the Mac, and no one else. These rules are requirements, not preferences:
+
+- **No remote reporting.** The app sends no data to anyone. There is no server, no team view, no sync, and no API for another program.
+- **No silent install or remote setup.** The app accepts no device-management configuration that turns capture on, hides the app, or blocks pause, delete or the exclude list. Every setting belongs to the user at the Mac.
+- **Always visible.** While the app captures, it shows an item in the menu bar. It has no hidden mode.
+- **The user owns the data.** Pause and Delete all data always work. Nothing leaves the app except through an Export that the user starts.
+- **Readable only by the app.** In a production build the evidence is encrypted, with a key that only the app can use (see above). An administrator who copies the files gets nothing readable. An administrator who can sign in as the user can still open the app. The app cannot prevent that, so it keeps as little as possible.
+- **Little to find.** The ledger holds minutes per allocation only. Typed text is never stored. Slice evidence is deleted after 14 days or sooner.
+- **The license should say so.** Open question: should the license or the terms forbid use to monitor another person? An MIT license cannot.
+
 ## Milestones
 
 Six milestones lead to a first release. Milestones 1 and 2 are tests that can change the plan. Each milestone has one exit check.
 
-1. **Model test.** Convert OpenJev 4B v5 and 0.8B v5 to 4-bit MLX. Run both in a Swift command-line tool on the target Mac. Exit check: the labels match the Python reference, and the time and memory for one slice are known.
+1. **Model test.** Done on 2026-10-08, see [model-test.md](model-test.md). Convert OpenJev 4B v5 and 0.8B v5 to 4-bit MLX. Run both in a Swift command-line tool on the target Mac. Exit check: the labels match the Python reference, and the time and memory for one slice are known.
 2. **Capture test.** Record two work days of slices in two ways: text recognition only, and Accessibility text. The user labels the slices by hand. Exit check: the accuracy of each way is known, and the choice between Option A and Option B is final.
 3. **Core app.** Build allocations, the ledger, the menu bar item, and the alerts at 80% and 100%. Exit check: a budget that is crossed during a real work day produces an alert in 2 minutes or less.
 4. **Corrections.** Build the timeline, block reassignment, pinned rules, the away-time prompt, and calendar labels. Exit check: a correction updates the ledger and the alerts immediately.
@@ -380,13 +408,16 @@ The largest risk is the text signal: the same app can hold work for two differen
 
 - [ ] Does this spec read "both options" correctly? It treats them as the Dayflow base and the screenpipe base.
 - [ ] Which Mac is the target: which chip and how much memory? The answer selects the 4B or the 0.8B checkpoint as default.
-- [ ] Is a download of about 3 GB acceptable? The alternative is a small installer that fetches the model at first launch.
+- [ ] Is a download of about 4.5 GB acceptable? The 8-bit 4B model is 4.2 GB. The alternatives are 6 bits (about 3.4 GB, not tested at scale), or a small installer that fetches the model at first launch.
+- [x] Is 4.9 GB of memory acceptable, against the proposed 4 GB target? Yes: the target is now 5 GB (decided 2026-10-08).
+- [ ] How does the app find Interrupts? The model misses them, as expected: the content does not show an interrupt. The time rule in "The Interrupts allocation" is not built yet.
+- [ ] Should a `None of these` win count as `Unassigned`, or as a separate "not work" label? The build uses `Unassigned`, so the slice adds no time.
 - [ ] Is Apple's on-device text recognition acceptable? It is a system framework, and it is not an open-weight model. The alternatives are Accessibility text only, or the OpenJev 4B v2 checkpoint on images.
 - [ ] Does the license of the Qwen3.5 base model permit redistribution inside an app? We did not check this license.
 - [ ] Is the app for one person, or will colleagues use it? The answer changes distribution and support.
 - [ ] Does the first release need day budgets, or week budgets only?
 - [ ] Does the current macOS release still ask for screen recording access each month? We checked macOS 15 only.
-- [ ] Does the file host accept one 3 GB file?
+- [ ] Does the file host accept one 4.5 GB file?
 - [ ] What is the name of the app?
 - [ ] How does the app detect a private browser window? Firefox puts "Private Browsing" in the window title. Safari and Chrome may not. The hello-world build matches title text only, so some private windows are not excluded.
 - [ ] Should the idle rule skip a meeting? Step 2 says yes, but the app does not read the calendar yet. Until it does, a meeting with no input counts as `Idle`.

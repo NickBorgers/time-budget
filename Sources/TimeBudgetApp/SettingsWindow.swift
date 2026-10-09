@@ -1,7 +1,8 @@
 import SwiftUI
 import TimeBudgetCore
 
-/// Allocations (spec F1), the exclude list (spec F8), and capture options.
+/// Allocations (spec F1), the classifier and its pinned rules (spec F3 and
+/// step 4), the exclude list (spec F8), and capture options.
 struct SettingsWindow: View {
   @Bindable var model: AppModel
   @State private var confirmDelete = false
@@ -9,6 +10,7 @@ struct SettingsWindow: View {
   var body: some View {
     TabView {
       allocations.tabItem { Label("Allocations", systemImage: "chart.bar") }
+      classifier.tabItem { Label("Classifier", systemImage: "wand.and.stars") }
       privacy.tabItem { Label("Privacy", systemImage: "hand.raised") }
     }
     .padding()
@@ -28,6 +30,50 @@ struct SettingsWindow: View {
         Text("Removing an allocation keeps its minutes in the ledger.")
           .font(.caption).foregroundStyle(.secondary)
       }
+    }
+  }
+
+  private var classifier: some View {
+    Form {
+      Section("Which label counts") {
+        Picker(
+          "Label",
+          selection: Binding(
+            get: { model.state.labelSource }, set: { model.setLabelSource($0) })
+        ) {
+          Text("The classifier's label").tag(LabelSource.model)
+          Text("My selection in the panel").tag(LabelSource.user)
+        }
+        .pickerStyle(.radioGroup)
+        Text(
+          "The classifier runs on each minute either way. Both labels go to the capture log, so you can measure how often they agree. With no model ready, your selection counts."
+        )
+        .font(.caption).foregroundStyle(.secondary)
+        LabeledContent("Model", value: modelText)
+      }
+      Section("Pinned rules: checked before the model, first match wins") {
+        ForEach(model.state.pinnedRules) { rule in
+          RuleEditor(
+            rule: rule, allocations: model.state.allocations, save: model.update,
+            remove: model.remove)
+        }
+        Button("Add rule") { model.addRule() }
+          .disabled(model.state.allocations.isEmpty)
+        Text(
+          "Example: window title starts with #partner- → Partner team help. A rule with empty text matches nothing."
+        )
+        .font(.caption).foregroundStyle(.secondary)
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  private var modelText: String {
+    switch model.modelStatus {
+    case .notBundled: "None in this build. Run make model, then make run."
+    case .loading: "Loading…"
+    case .ready(let name): name
+    case .failed(let error): "Did not load: \(error)"
     }
   }
 
@@ -132,6 +178,43 @@ private struct AllocationEditor: View {
     Binding(
       get: { allocation.budgetMinutes % 60 },
       set: { allocation.budgetMinutes = allocation.budgetMinutes / 60 * 60 + $0 })
+  }
+}
+
+private struct RuleEditor: View {
+  @State var rule: PinnedRule
+  let allocations: [Allocation]
+  let save: (PinnedRule) -> Void
+  let remove: (PinnedRule) -> Void
+
+  var body: some View {
+    HStack {
+      Picker("", selection: $rule.field) {
+        Text("App").tag(PinnedRule.Field.app)
+        Text("Window title").tag(PinnedRule.Field.windowTitle)
+        Text("Website").tag(PinnedRule.Field.host)
+      }
+      .labelsHidden().fixedSize()
+      Picker("", selection: $rule.match) {
+        Text("contains").tag(PinnedRule.Match.contains)
+        Text("starts with").tag(PinnedRule.Match.startsWith)
+        Text("is").tag(PinnedRule.Match.equals)
+      }
+      .labelsHidden().fixedSize()
+      TextField("text", text: $rule.text)
+      Image(systemName: "arrow.right")
+      Picker("", selection: $rule.allocationID) {
+        ForEach(allocations) { Text($0.name).tag($0.id) }
+      }
+      .labelsHidden().fixedSize()
+      Button(role: .destructive) {
+        remove(rule)
+      } label: {
+        Image(systemName: "trash")
+      }
+      .buttonStyle(.borderless)
+    }
+    .onChange(of: rule) { _, new in save(new) }
   }
 }
 
