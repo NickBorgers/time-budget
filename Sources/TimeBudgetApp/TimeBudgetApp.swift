@@ -1,16 +1,35 @@
 import SwiftUI
 import TimeBudgetCore
 
-/// Scaffold only: proves the app target builds, links TimeBudgetCore, and runs
-/// as a menu bar item. Capture, classification, and the ledger are later work.
+/// The menu bar app. Run it as a bundle (`make run`): notifications and the
+/// macOS permissions need a bundle identifier.
 @main
 struct TimeBudgetApp: App {
+  // SwiftUI creates the App value once, so a plain constant holds the one
+  // model. @Observable tracks it without @State.
+  private let model: AppModel
+  @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
+
+  init() {
+    let model = AppModel()
+    self.model = model
+    // Start capture at launch, not when the panel first opens.
+    DispatchQueue.main.async { model.start() }
+  }
+
   var body: some Scene {
-    MenuBarExtra("Time Budget") {
-      Text("Time Budget")
-      Divider()
-      Button("Quit") {
-        NSApplication.shared.terminate(nil)
+    MenuBarExtra {
+      MenuPanel(model: model)
+    } label: {
+      Label(model.menuBarTitle, systemImage: model.menuBarSymbol)
+        .labelStyle(.titleAndIcon)
+    }
+    .menuBarExtraStyle(.window)
+    .commands {
+      // The app menu's "Settings…" item opens the AppKit settings window.
+      CommandGroup(replacing: .appSettings) {
+        Button("Settings…") { SettingsWindowController.show() }
+          .keyboardShortcut(",")
       }
     }
   }

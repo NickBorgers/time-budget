@@ -6,15 +6,23 @@ work, it ships inside the app, and no data leaves the Mac.
 
 Status: early. The design is in [`docs/product-spec.md`](docs/product-spec.md) and
 is tentative until its first two milestones (a model test and a capture test) are
-done. The code here so far is the platform-neutral core.
+done.
+
+The current build is a hello-world version for manual testing. You choose the
+work type by hand. The app captures evidence each minute, keeps the ledger, and
+sends the budget alerts. No model runs yet. See
+[`docs/manual-test.md`](docs/manual-test.md).
 
 ## Layout
 
 | Path | What is in it |
 | --- | --- |
 | `docs/product-spec.md` | The product spec: goals, requirements, options, milestones, open questions |
-| `Sources/TimeBudgetCore/` | Platform-neutral logic: allocations, budget status, alert thresholds |
-| `Sources/TimeBudgetApp/` | The Mac app itself (macOS only): SwiftUI, the menu bar item |
+| `docs/manual-test.md` | How to build, run, and check the current Mac app by hand |
+| `docs/test-results.md` | What each manual test session showed works, and what is still untested |
+| `Sources/TimeBudgetCore/` | Platform-neutral logic: allocations, ledger, alerts, exclude list, slice rules, capture log format |
+| `Sources/TimeBudgetApp/` | The Mac app itself (macOS only): menu bar panel, settings, capture, notifications |
+| `App/Info.plist` | The bundle settings that `make app` puts in `.build/TimeBudget.app` |
 | `Tests/TimeBudgetCoreTests/` | Tests for the core, using Swift Testing |
 | `.devcontainer/` | Linux dev environment with the Swift toolchain |
 | `.github/workflows/ci.yml` | CI: `make check` on Linux, build and test on macOS |
@@ -61,8 +69,15 @@ run it:
 ```
 make build   # builds TimeBudgetCore and TimeBudgetApp
 make check   # format check, build, and test
-make run     # launches the menu bar scaffold
+make app     # wraps the app in .build/TimeBudget.app, signed ad hoc
+make run     # builds the bundle and opens it
+make install # copies the bundle to ~/Applications, for Spotlight or Finder
 ```
+
+Use `make run`, not `swift run`. Notifications and the macOS permissions need
+an app bundle. A bundle also makes macOS ask for permissions for Time Budget,
+not for your terminal. After a rebuild, an old Accessibility grant can stop
+working: run `make reset-permissions`, then grant again.
 
 `Package.swift` guards the app target with `#if os(macOS)`, so the
 devcontainer's Linux `swift build` still sees only `TimeBudgetCore`.

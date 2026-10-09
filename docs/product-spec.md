@@ -388,6 +388,10 @@ The largest risk is the text signal: the same app can hold work for two differen
 - [ ] Does the current macOS release still ask for screen recording access each month? We checked macOS 15 only.
 - [ ] Does the file host accept one 3 GB file?
 - [ ] What is the name of the app?
+- [ ] How does the app detect a private browser window? Firefox puts "Private Browsing" in the window title. Safari and Chrome may not. The hello-world build matches title text only, so some private windows are not excluded.
+- [ ] Should the idle rule skip a meeting? Step 2 says yes, but the app does not read the calendar yet. Until it does, a meeting with no input counts as `Idle`.
+- [ ] Should the app show a Dock icon? The spec describes a menu bar app, which usually has none. The test build shows one, because a hidden menu bar item left no way to reach the app.
+- [ ] How is the development build signed? An ad-hoc signature changes at each build, and macOS then drops the Accessibility grant. A Developer ID certificate fixes this.
 
 ## Sources
 

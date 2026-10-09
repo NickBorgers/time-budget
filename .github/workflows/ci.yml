@@ -24,3 +24,5 @@ jobs:
       # the app ships on.
       - run: swift build
       - run: swift test
+      # The bundle that manual testing uses must also build.
+      - run: make app
