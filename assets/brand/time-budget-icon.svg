@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#253C53"/><stop offset="1" stop-color="#0C1725"/></linearGradient><linearGradient id="glow" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFFFF" stop-opacity=".14"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient></defs>
+<rect x="44" y="44" width="936" height="936" rx="210" fill="url(#bg)"/>
+<rect x="45" y="45" width="934" height="934" rx="209" fill="url(#glow)" stroke="#FFFFFF" stroke-opacity=".14" stroke-width="2"/>
+<circle cx="512" cy="520" r="260" fill="none" stroke="#7892A9" stroke-opacity=".17" stroke-width="116"/>
+<path d="M 512.00 260.00 A 260 260 0 0 1 765.34 461.51" fill="none" stroke="#5EE3C1" stroke-width="116" stroke-linecap="butt"/><path d="M 769.47 483.81 A 260 260 0 0 1 661.13 732.98" fill="none" stroke="#6DABFF" stroke-width="116" stroke-linecap="butt"/><path d="M 642.00 745.17 A 260 260 0 0 1 351.93 724.88" fill="none" stroke="#A89BFF" stroke-width="116" stroke-linecap="butt"/><path d="M 334.68 710.15 A 260 260 0 0 1 259.72 457.10" fill="none" stroke="#FFC57D" stroke-width="116" stroke-linecap="butt"/>
+<circle cx="512" cy="520" r="159" fill="#101F30"/>
+<path d="M 512 406 V 520 L 589 565" fill="none" stroke="#F5FAFF" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="512" cy="520" r="19" fill="#F5FAFF"/>
+</svg>
