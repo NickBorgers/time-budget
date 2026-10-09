@@ -8,6 +8,8 @@
 	<string>Time Budget</string>
 	<key>CFBundleDisplayName</key>
 	<string>Time Budget</string>
+	<key>CFBundleIconFile</key>
+	<string>TimeBudget</string>
 	<key>CFBundleExecutable</key>
 	<string>TimeBudget</string>
 	<key>CFBundlePackageType</key>

@@ -21,7 +21,8 @@ SIGN_ID ?= $(or $(shell security find-identity -v -p codesigning 2>/dev/null | a
 app:
 	swift build --product TimeBudgetApp
 	rm -rf $(APP)
-	mkdir -p $(APP)/Contents/MacOS
+	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
+	cp assets/brand/TimeBudget.icns $(APP)/Contents/Resources/TimeBudget.icns
 	cp "$$(swift build --show-bin-path)/TimeBudgetApp" $(APP)/Contents/MacOS/TimeBudget
 	cp App/Info.plist $(APP)/Contents/Info.plist
 	codesign --force --sign "$(SIGN_ID)" --identifier $(BUNDLE_ID) $(APP)
