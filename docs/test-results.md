@@ -4,6 +4,26 @@ This file records what was tested on a real Mac, and what the test showed.
 The checklist itself is in [`manual-test.md`](manual-test.md). Add a new
 section for each test session. Put the newest at the top.
 
+## 2026-10-08: classifier build, first run
+
+**Summary.** The app bundle loads the 4B model from `Contents/Resources/Models`
+and labels each minute on the Mac. Over 5 minutes in Ghostty, the model ran on
+4 minutes. The fifth minute matched the one before, so the app copied its label
+and did not run the model. CPU use was near 0% between model runs. The checklist
+in [`manual-test.md`](manual-test.md) step 6 is not run yet.
+
+| Area | Result | Evidence |
+| --- | --- | --- |
+| Model test | 18 of 18 slices give the same winner as the Python reference | [`model-test.md`](model-test.md) |
+| Bundle | `make app` copies the MLX shader bundle and the model. The model loads at launch | `decision` with `method: model` in the log |
+| Live labels | 1 minute labeled at 75%. 3 minutes below the 0.6 threshold, so `Unassigned` | Capture log, 03:26 to 03:30 UTC |
+| Step 3, unchanged | Same screen copied the label with no model run | `method: unchanged` at 03:30:40 |
+| Memory | About 5.2 GB resident with the model loaded | `ps` |
+| Signing | Only `make app` and `make run` use the signing key. `swift build`, `swift test` and `model-check` are ad hoc signed | `codesign -dv` on the build products |
+
+Not yet validated: the panel's **Detected** section and reason line, pinned
+rules, the label-source setting, and alerts from model labels.
+
 ## 2026-10-08: first manual test session
 
 **Summary.** The core loop works on a real Mac. The app captures evidence

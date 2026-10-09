@@ -7,7 +7,9 @@ on:
 jobs:
   linux:
     runs-on: ubuntu-latest
-    container: swift:6.0-jammy
+    # The official Swift image, from the Amazon ECR Public mirror of Docker
+    # official images. Docker Hub limits unauthenticated pulls, which failed CI.
+    container: public.ecr.aws/docker/library/swift:6.0-jammy
     steps:
       - uses: actions/checkout@v4
       # The Swift image has no make, which the devcontainer's setup.sh also adds.
@@ -17,12 +19,14 @@ jobs:
       - run: make check
 
   macos:
-    runs-on: macos-15
+    # mlx-swift-lm, the model runtime, needs Swift 6.2 or later (Xcode 26).
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       # The core and the Mac app target both build and test on the platform
       # the app ships on.
       - run: swift build
       - run: swift test
-      # The bundle that manual testing uses must also build.
-      - run: make app
+      # The bundle that manual testing uses must also build. CI has no model,
+      # so the bundle has no classifier; `make model` needs a 9 GB download.
+      - run: make app SIGN_ID=-

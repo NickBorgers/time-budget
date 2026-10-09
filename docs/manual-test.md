@@ -2,19 +2,24 @@
 
 Results of past test sessions are in [`test-results.md`](test-results.md).
 
-This build runs the whole loop with you as the classifier. You choose the
-allocation that you work on. Each minute, the app records a slice of evidence
-with your label. It adds the minute to that allocation and alerts you at 80%
-and at 100% of the budget.
+This build runs the whole loop with the model as the classifier. Each minute,
+the app records a slice of evidence. The OpenJev model labels it, the minute
+goes to that allocation, and the app alerts you at 80% and at 100% of the
+budget.
 
-No model runs yet. The capture log is the hand-labeled data that milestone 2
-needs.
+You can still select the allocation you work on. Your selection goes to the log
+next to the model's label, so the two can be compared. That log is the
+hand-labeled data that milestone 2 needs. In **Settings… → Classifier**, you can
+make your selection count instead of the model's label.
 
 ## Build and launch
 
 ```
+make model   # once: builds Models/openjev-4b-v5, about 9 GB to download
 make run
 ```
+
+Without the model, the app runs with no classifier, and your selection counts.
 
 This builds `.build/TimeBudget.app`, signs it ad hoc, and opens it. Two things
 appear:
@@ -129,15 +134,51 @@ Budgets of 20 hours take too long to test. Use a small budget.
    in the log.
 3. Click **Resume**. Capture starts again.
 
-### 6. Delete all data
+### 6. Classifier
+
+1. Open the panel. The **Detected** section names the model, for example
+   `qwen3.5-4b-nli-v5`. Until the model loads, it says `Loading the model…`.
+   Loading takes a few seconds.
+2. Work in one app for 2 minutes. **Detected** shows an allocation, a
+   percentage, and a reason line: the app, the window title, and the top two
+   scores.
+3. The menu bar shows the detected allocation and its time left. Keep working.
+   The detected allocation's bar grows by one minute each minute.
+4. Stay on the same screen. The reason line says `Same screen as the minute
+   before.` The model did not run for that minute.
+5. In the panel, select the allocation you really work on. The heading says
+   `Your label (not counted)`. In the log, `userLabel` is your selection and
+   `label` is the model's.
+6. In **Settings… → Classifier**, add a rule: **Window title**, **contains**, a
+   word in the current window title, then an allocation. After the next minute,
+   the reason line says `Rule: window title contains "…"`, at 100%.
+7. Choose **My selection in the panel**. The menu bar shows your selection
+   again, and only your selection adds time. **Detected** still updates.
+8. Type a Slack message for a minute. The **Last capture** line says
+   `N chars typed`. In the log, `evidence.typedCharacters` is set, and the
+   typed words appear nowhere in the file. Type into a password field: the
+   count does not grow.
+9. Check the CPU in Activity Monitor. Time Budget uses a core for about 2
+   seconds when a minute's screen changed, and almost nothing otherwise. It
+   uses about 5 GB of memory with the model loaded.
+
+### 7. Delete all data
 
 **Settings… → Privacy → Delete all data…** deletes the ledger, the log, and
 your allocations. The panel returns to the starter set at zero.
 
 ## What this build does not do yet
 
-- No model. Your selection is the label.
-- No timeline, no corrections, no pinned rules, no away-time prompt (milestone 4).
+- The capture log is plain text. A production build will encrypt it, or keep
+  none. See the spec, "The capture log in a production build".
+
+- No Interrupts rule. The model sees content, and an interrupt is a pattern in
+  time. Interrupts are mostly missed.
+- No smoothing of single minutes between two blocks (spec step 7).
+- App-switch slices are not classified. Only minute slices are, because only
+  they add time.
+- No timeline, no corrections, no away-time prompt (milestone 4). Pinned rules
+  exist, but a correction does not offer one yet.
 - No calendar. A meeting with no keyboard or mouse input counts as `Idle`.
 - No decline message in the alert (spec F10).
 - No color change on the menu bar item. A warning triangle shows instead,
@@ -151,3 +192,6 @@ For the capture test, note for each app you use:
 - Whether the Accessibility text shows who made the request.
 - Whether the recognized text is better or worse than the Accessibility text.
 - Any app that shows no text at all.
+- Minutes where the **Detected** label is wrong, with the app and what you
+  really did. To score a whole day against your selections, see
+  [`model-test.md`](model-test.md).

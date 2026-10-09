@@ -35,4 +35,39 @@ struct SavedStateTests {
     let data = try JSONEncoder().encode(state)
     #expect(try JSONDecoder().decode(SavedState.self, from: data) == state)
   }
+
+  @Test func readsAStateFromBeforeTheClassifier() throws {
+    // The hello-world build saved no rules and no label source.
+    let old = SavedState(pausedUntil: date(8))
+    var json = try #require(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
+    json["pinnedRules"] = nil
+    json["labelSource"] = nil
+    let data = try JSONSerialization.data(withJSONObject: json)
+    let state = try JSONDecoder().decode(SavedState.self, from: data)
+    #expect(state.pinnedRules.isEmpty)
+    #expect(state.labelSource == .model)
+    #expect(state.allocations == old.allocations)
+    #expect(state.pausedUntil == old.pausedUntil)
+  }
+
+  @Test func roundTripsRulesAndLabelSource() throws {
+    var state = SavedState()
+    state.labelSource = .user
+    state.pinnedRules = [
+      PinnedRule(
+        field: .host, match: .equals, text: "github.com", allocationID: state.allocations[0].id)
+    ]
+    let data = try JSONEncoder().encode(state)
+    #expect(try JSONDecoder().decode(SavedState.self, from: data) == state)
+  }
+
+  @Test func theUserLabelCountsWhenAskedOrWhenThereIsNoModel() {
+    var state = SavedState()
+    #expect(state.labelSource == .model)
+    #expect(state.countsModelLabel(modelReady: true))
+    #expect(!state.countsModelLabel(modelReady: false))
+    state.labelSource = .user
+    #expect(!state.countsModelLabel(modelReady: true))
+  }
 }
