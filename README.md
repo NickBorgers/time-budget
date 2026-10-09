@@ -14,6 +14,7 @@ done. The code here so far is the platform-neutral core.
 | --- | --- |
 | `docs/product-spec.md` | The product spec: goals, requirements, options, milestones, open questions |
 | `Sources/TimeBudgetCore/` | Platform-neutral logic: allocations, budget status, alert thresholds |
+| `Sources/TimeBudgetApp/` | The Mac app itself (macOS only): SwiftUI, the menu bar item |
 | `Tests/TimeBudgetCoreTests/` | Tests for the core, using Swift Testing |
 | `.devcontainer/` | Linux dev environment with the Swift toolchain |
 | `.github/workflows/ci.yml` | CI: `make check` on Linux, build and test on macOS |
@@ -32,6 +33,39 @@ the Claude Code and Codex CLIs and logins, `gh`, and this project's Claude memor
 `make fmt` formats the sources in place.
 
 Without a devcontainer: install Swift 6.0 or later and run the same `make` targets.
+
+## Building the Mac app
+
+The Mac app needs macOS 14 or later and full Xcode, not only the Command Line
+Tools. Install Xcode from the Mac App Store.
+
+After Xcode finishes installing, run these three commands once, in a real
+Terminal. Each needs your password, so an agent session cannot run them for
+you:
+
+```
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -license accept
+sudo xcodebuild -runFirstLaunch
+```
+
+Check it worked:
+
+```
+xcodebuild -version   # prints a version, instead of a Command Line Tools error
+```
+
+Then the same `make` targets as the core build the app too, plus one more to
+run it:
+
+```
+make build   # builds TimeBudgetCore and TimeBudgetApp
+make check   # format check, build, and test
+make run     # launches the menu bar scaffold
+```
+
+`Package.swift` guards the app target with `#if os(macOS)`, so the
+devcontainer's Linux `swift build` still sees only `TimeBudgetCore`.
 
 ## What builds where
 

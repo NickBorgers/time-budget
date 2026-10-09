@@ -1,13 +1,17 @@
-.PHONY: all check build test lint fmt clean
+.PHONY: all check build test run lint fmt clean
 
 all: check
 
 ## check: format check, build, and run the tests (what CI runs)
 check: lint build test
 
-## build: compile the core
+## build: compile the core, and the Mac app on macOS
 build:
 	swift build
+
+## run: launch the Mac app scaffold (macOS only)
+run:
+	swift run TimeBudgetApp
 
 ## test: run the test suite only
 test:

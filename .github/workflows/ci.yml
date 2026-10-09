@@ -20,7 +20,7 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      # The core must build and pass on the platform the app ships on. The Mac
-      # app target will be built here once it exists.
+      # The core and the Mac app target both build and test on the platform
+      # the app ships on.
       - run: swift build
       - run: swift test
