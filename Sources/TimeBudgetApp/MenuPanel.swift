@@ -17,7 +17,12 @@ struct MenuPanel: View {
         Divider()
       }
 
-      Text("What are you working on?").font(.headline)
+      HStack {
+        Text("What are you working on?").font(.headline)
+        Spacer()
+        Button("Edit…") { SettingsOpener.open() }
+          .help("Add, rename, remove, and budget your allocations")
+      }
       VStack(spacing: 6) {
         ForEach(model.state.allocations) { allocation in
           AllocationRow(
@@ -37,9 +42,7 @@ struct MenuPanel: View {
       Divider()
 
       HStack {
-        SettingsLink { Text("Settings…") }
-          // A menu bar app is not active, so its window would open behind others.
-          .simultaneousGesture(TapGesture().onEnded { NSApp.activate(ignoringOtherApps: true) })
+        Button("Settings…") { SettingsOpener.open() }
         Button("Capture log") { model.openDataFolder() }
         Spacer()
         Button("Quit") { NSApplication.shared.terminate(nil) }
@@ -176,5 +179,15 @@ private struct PermissionRow: View {
         Button("Grant…", action: action)
       }
     }
+  }
+}
+
+/// Opens the Settings scene. SettingsLink works only inside SwiftUI scenes,
+/// and the main window is an AppKit window, so this sends the menu action.
+@MainActor
+enum SettingsOpener {
+  static func open() {
+    NSApp.activate(ignoringOtherApps: true)
+    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
   }
 }
