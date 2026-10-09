@@ -27,6 +27,7 @@ final class AppModel {
   private let calendar = Calendar.autoupdatingCurrent
   private var timer: Timer?
   private var capturing = false
+  private var appSwitchTask: Task<Void, Never>?
   /// Minutes that arrived while a read was running, each with the label the
   /// user had selected at that minute.
   private var pendingMinutes: [(time: Date, selected: SliceLabel)] = []
@@ -64,7 +65,7 @@ final class AppModel {
     NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
     ) { [weak self] _ in
-      MainActor.assumeIsolated { self?.capture(.appSwitch) }
+      MainActor.assumeIsolated { self?.scheduleAppSwitchCapture() }
     }
     // The user grants permissions in System Settings, then comes back.
     NotificationCenter.default.addObserver(
@@ -82,6 +83,18 @@ final class AppModel {
   }
 
   // MARK: - Capture
+
+  /// macOS reports the app switch before the new app has a focused window.
+  /// Reading at once finds no window, so wait a moment. A quick run of switches
+  /// gives one read, of the app the user stopped on.
+  private func scheduleAppSwitchCapture() {
+    appSwitchTask?.cancel()
+    appSwitchTask = Task { [weak self] in
+      try? await Task.sleep(for: .milliseconds(500))
+      guard !Task.isCancelled else { return }
+      self?.capture(.appSwitch)
+    }
+  }
 
   func capture(
     _ trigger: SliceTrigger, at time: Date = Date(), selected: SliceLabel? = nil
