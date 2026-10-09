@@ -8,6 +8,7 @@ import SwiftUI
 enum MainWindow {
   private static var window: NSWindow?
   private static weak var model: AppModel?
+  static var currentModel: AppModel? { model }
 
   static func show(model: AppModel) {
     self.model = model
@@ -23,6 +24,30 @@ enum MainWindow {
       window.styleMask = [.titled, .closable, .miniaturizable]
       // Closing hides the window. Reopening the app shows it again.
       window.isReleasedWhenClosed = false
+      window.center()
+      self.window = window
+    }
+    window?.makeKeyAndOrderFront(nil)
+    NSApp.activate(ignoringOtherApps: true)
+  }
+}
+
+/// The settings window: allocations, exclusions, capture options. AppKit for
+/// the same reason as the main window: SwiftUI opens its Settings scene only
+/// from SettingsLink inside a SwiftUI scene, and ignores the old menu action.
+@MainActor
+enum SettingsWindowController {
+  private static var window: NSWindow?
+
+  static func show() {
+    guard let model = MainWindow.currentModel else { return }
+    if window == nil {
+      let window = NSWindow(
+        contentViewController: NSHostingController(rootView: SettingsWindow(model: model)))
+      window.title = "Time Budget Settings"
+      window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+      window.isReleasedWhenClosed = false
+      window.setContentSize(NSSize(width: 600, height: 520))
       window.center()
       self.window = window
     }

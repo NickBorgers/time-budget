@@ -25,9 +25,12 @@ struct TimeBudgetApp: App {
         .labelStyle(.titleAndIcon)
     }
     .menuBarExtraStyle(.window)
-
-    Settings {
-      SettingsWindow(model: model)
+    .commands {
+      // The app menu's "Settings…" item opens the AppKit settings window.
+      CommandGroup(replacing: .appSettings) {
+        Button("Settings…") { SettingsWindowController.show() }
+          .keyboardShortcut(",")
+      }
     }
   }
 }
