@@ -19,6 +19,7 @@ sends the budget alerts. No model runs yet. See
 | --- | --- |
 | `docs/product-spec.md` | The product spec: goals, requirements, options, milestones, open questions |
 | `docs/manual-test.md` | How to build, run, and check the current Mac app by hand |
+| `docs/test-results.md` | What each manual test session showed works, and what is still untested |
 | `Sources/TimeBudgetCore/` | Platform-neutral logic: allocations, ledger, alerts, exclude list, slice rules, capture log format |
 | `Sources/TimeBudgetApp/` | The Mac app itself (macOS only): menu bar panel, settings, capture, notifications |
 | `App/Info.plist` | The bundle settings that `make app` puts in `.build/TimeBudget.app` |

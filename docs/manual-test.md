@@ -1,5 +1,7 @@
 # Manual test: hello-world build
 
+Results of past test sessions are in [`test-results.md`](test-results.md).
+
 This build runs the whole loop with you as the classifier. You choose the
 allocation that you work on. Each minute, the app records a slice of evidence
 with your label. It adds the minute to that allocation and alerts you at 80%
